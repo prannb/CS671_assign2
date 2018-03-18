@@ -1,11 +1,10 @@
 import os
 import glob
 
-from sklearn.feature_extraction.text import CountVectorizer
-from tqdm import tqdm
+
 
 def getCorpus(corpus, path):
-	for filename in tqdm(glob.glob(os.path.join(path, '*.txt'))):
+	for filename in (glob.glob(os.path.join(path, '*.txt'))):
 		f = open(filename, 'r')
 		txt = f.read()
 		corpus.append(txt)
@@ -13,6 +12,8 @@ def getCorpus(corpus, path):
 
 
 def main():
+	from sklearn.feature_extraction.text import CountVectorizer
+	from tqdm import tqdm
 	vectorizer = CountVectorizer(stop_words='english', binary=True)
 	
 	print("Reading positive reviews:")

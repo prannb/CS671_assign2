@@ -17,4 +17,5 @@ print model.most_similar('award')
 print model.doesnt_match("breakfast cereal dinner lunch".split())
 print model.doesnt_match("cat dog table".split())
 #vector representation of word human
-print model['human']
+w = 'human'
+print model[w]

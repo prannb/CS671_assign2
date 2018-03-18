@@ -16,12 +16,13 @@ stop_words = set(stopwords.words('english'))
 def getGloveVec(txt, filename):
 	vec = 0
 	num = 0
-	word_tokens = word_tokenize(txt)
+	word_tokens = txt.split(' ')
 	for w in word_tokens:
-		if (w not in stop_words) and re.match(r"\w", w):
-			print(w + " " + filename)
+		if to=re.match(r"\w+", w):
+			to = re.match(r"\w+", w)
+			print(to.group())
 			try:
-				u_word = unicode(w)
+				u_word = unicode(to.group())
 			except UnicodeDecodeError:
 				continue
 			final = nlp(u_word)
@@ -41,12 +42,12 @@ def getCorpusGlove(corpus, path):
 def main():
 	print("Reading positive reviews:")
 	corpus_pos = []
-	corpus_pos = getCorpusGlove(corpus_pos, '../dataset/train/pos')
+	corpus_pos = getCorpusGlove(corpus_pos, '../pos')
 	len_pos = len(corpus_pos)
-	print(corpus_pos[0])
+	# print(corpus_pos[0])
 
 	print("Reading negative reviews:")	
-	corpus_tot = getCorpusGlove(corpus_pos, '../dataset/train/neg')
+	corpus_tot = getCorpusGlove(corpus_pos, '../neg')
 	len_neg = len(corpus_tot) - len_pos
 
 	for i in corpus[0]:
