@@ -1,11 +1,11 @@
 import os
 import glob
+import numpy as np
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from tqdm import tqdm
 
 def getCorpus(corpus, path):
-	corpus = []
 	for filename in tqdm(glob.glob(os.path.join(path, '*.txt'))):
 		f = open(filename, 'r')
 		txt = f.read()
@@ -28,6 +28,10 @@ def main():
 	mat = (vectorizer.fit_transform(corpus_tot)).toarray()
 	voc = vectorizer.vocabulary_
 	voc_size = len(voc)
+	
+	mat = np.array(mat)
+	print(mat.shape)
+	# np.savetxt("tfidf.txt", mat)
 	# print(mat[0])
 	# for i in mat[0]:
 	# 	print i

@@ -5,7 +5,6 @@ from sklearn.feature_extraction.text import CountVectorizer
 from tqdm import tqdm
 
 def getCorpus(corpus, path):
-	corpus = []
 	for filename in tqdm(glob.glob(os.path.join(path, '*.txt'))):
 		f = open(filename, 'r')
 		txt = f.read()
