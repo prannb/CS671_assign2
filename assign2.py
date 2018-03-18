@@ -19,10 +19,10 @@ nlp = spacy.load('en')
 
 stop_words = set(stopwords.words('english'))
 
-path_train_pos = 'dataset/train/pos/'
-path_train_neg = 'dataset/train/neg/'
-path_test_pos = 'dataset/test/pos/'
-path_test_neg = 'dataset/test/neg/'
+path_train_pos = '../dataset/train/pos/'
+path_train_neg = '../dataset/train/neg/'
+path_test_pos = '../dataset/test/pos/'
+path_test_neg = '../dataset/test/neg/'
 
 def randomise(mat, len_pos, len_neg):
 	a = np.ones([len_pos, 1])
@@ -39,6 +39,22 @@ def getCorpus(corpus, path):
 		txt = f.read()
 		corpus.append(txt)
 	return corpus
+
+def getVocab(path1, path2):
+	print("Getting Vocab:")
+	vectorizer = CountVectorizer(stop_words='english', binary=True)
+	
+	corpus_pos = []
+	corpus_pos = getCorpus(corpus_pos, path1)
+	len_pos = len(corpus_pos)
+
+	corpus_tot = getCorpus(corpus_pos, path2)
+	len_neg = len(corpus_tot) - len_pos
+
+	mat = (vectorizer.fit_transform(corpus_tot)).toarray()
+	voc = vectorizer.vocabulary_
+	# mat = np.array(mat)
+	return voc
 
 def bbow(path1, path2):
 	print("Document to Binary Bag of Words:")
@@ -58,9 +74,9 @@ def bbow(path1, path2):
 	mat = np.array(mat)
 	return randomise(mat, len_pos, len_neg)
 
-def tf(path1, path2):
+def tf(path1, path2, voc):
 	print("Document to tf matrix:")
-	vectorizer = CountVectorizer(stop_words='english')
+	vectorizer = CountVectorizer(stop_words='english', vocabulary=voc)
 	
 	print("Reading positive reviews:")
 	corpus_pos = []
@@ -75,7 +91,7 @@ def tf(path1, path2):
 	voc = vectorizer.vocabulary_
 	voc_size = len(voc)
 	mat = mat / (voc_size*1.0)
-	mat = np.array(mat)	
+	mat = np.array(mat)
 	# print(mat.shape)
 	return randomise(mat, len_pos, len_neg)
 
@@ -138,13 +154,21 @@ def glove(path1, path2):
 
 #-------------- Classification Algorithms --------------------------------------------------
 
+def getAccuracy(ytest, y_pred):
+	tot = 0.0
+	for i in range(ytest.shape[0]):
+		if ytest[i] == y_pred[i]:
+			tot = tot + 1
+	return tot/(ytest.shape[0] * 1.0)
+
 from sklearn.naive_bayes import GaussianNB
 def naivebayes(xtrain, ytrain, xtest, ytest):
 	gnb = GaussianNB()
 	print("Performing Naive Bayes classification:")
 	y_pred = gnb.fit(xtrain,ytrain).predict(xtest)
 	# (iris.data.shape[0],(iris.target != y_pred).sum()))
-	return y_pred
+	accur = getAccuracy(ytest, y_pred)
+	return accur
 
 from sklearn.linear_model import LogisticRegression
 # from sklearn.cross_validation import train_test_split
@@ -160,7 +184,8 @@ def supportVM(xtrain, ytrain, xtest, ytest):
 	clf = svm.SVC()
 	clf.fit(xtrain, ytrain)
 	y_pred = clf.predict(xtest)
-	return y_pred
+	accur = getAccuracy(ytest, y_pred)
+	return accur
 
 from sklearn.neural_network import MLPClassifier
 def neural_network(xtrain, ytrain, xtest, ytest):
@@ -169,18 +194,36 @@ def neural_network(xtrain, ytrain, xtest, ytest):
                     hidden_layer_sizes=(5, 2), random_state=1)
 	clf.fit(xtrain, ytrain)
 	y_pred = clf.predict(xtest)
-	return y_pred
+	accur = getAccuracy(ytest, y_pred)
+	return accur
 
 #----------------- Combining the above two ---------------------------------------------------
 
 def main():
-	mat1 = tf(path_train_pos, path_train_neg)
-	mat2 = tfidf(path_train_pos, path_train_neg)
-	mat3 = bbow(path_train_pos, path_train_neg)
+	voc = getVocab(path_train_pos, path_train_neg)
+	# print voc
+	# exit()
+	mat1 = tf(path_train_pos, path_train_neg, voc)
+	# mat2 = tfidf(path_train_pos, path_train_neg)
+	# mat3 = bbow(path_train_pos, path_train_neg)
 	# mat4 = glove(path_train_pos, path_train_neg)
-	print(mat1.shape)
-	print(mat2.shape)
-	print(mat3.shape)
+	# print(mat1.shape)
+	# print(mat2.shape)
+	# print(mat3.shape)
 	# print(mat4.shape)
+	ytrain = mat1[:, 0:1]
+	ytrain = ytrain.reshape((ytrain.shape[0],))	
+	xtrain = mat1[:, 1:]
+	mat1 = tf(path_test_pos, path_test_neg, voc)
+	ytest = mat1[:, 0:1]
+	ytest = ytest.reshape((ytest.shape[0],))
+	# print ytest.shape
+	# ytest.reshape(2012)
+	xtest = mat1[:, 1:]
+	print neural_network(xtrain, ytrain, xtest, ytest)
+	print naivebayes(xtrain, ytrain, xtest, ytest)
+	print logisticRegression(xtrain, ytrain, xtest, ytest)
+	print supportVM(xtrain, ytrain, xtest, ytest)
+	
 
 main()

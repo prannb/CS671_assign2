@@ -13,13 +13,17 @@ nlp = spacy.load('en')
 
 stop_words = set(stopwords.words('english'))
 
-def getGloveVec(txt):
+def getGloveVec(txt, filename):
 	vec = 0
 	num = 0
 	word_tokens = word_tokenize(txt)
 	for w in word_tokens:
 		if (w not in stop_words) and re.match(r"\w", w):
-			u_word = unicode(w)
+			print(w + " " + filename)
+			try:
+				u_word = unicode(w)
+			except UnicodeDecodeError:
+				continue
 			final = nlp(u_word)
 			vec = vec + final.vector
 			num = num + 1
@@ -29,7 +33,7 @@ def getCorpusGlove(corpus, path):
 	for filename in tqdm(glob.glob(os.path.join(path, '*.txt'))):
 		f = open(filename, 'r')
 		txt = f.read()
-		vec = getGloveVec(txt)
+		vec = getGloveVec(txt, filename)
 		corpus.append(vec)
 	return corpus
 
