@@ -6,19 +6,29 @@ import gensim
 import spacy
 
 from scipy import sparse
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfVectorizer
+# from sklearn.feature_extraction.text import CountVectorizer
+# from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.datasets import load_svmlight_file
+from sklearn.preprocessing import normalize
 from tqdm import tqdm
 from nltk.corpus import brown
 from spacy.vectors import Vectors
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
 
+from gensim.models.keyedvectors import KeyedVectors
+
 #-------------- Document to Doc Vector --------------------------------------------------
+
+baseline = 5
 
 nlp = spacy.load('en')
 
 stop_words = set(stopwords.words('english'))
+
+path_train_feat = 'dataset/train/rand_labeledBow.feat'
+path_test_feat = 'dataset/test/rand_labeledBow.feat'
 
 path_train_pos = '../dataset/train/pos/'
 path_train_neg = '../dataset/train/neg/'
@@ -117,6 +127,23 @@ def tf(which, path1, path2, voc):
 		vectorizer = CountVectorizer(stop_words='english', binary=True, vocabulary=voc)
 		mat = vectorizer.fit_transform(corpus_rand)
 	return (mat, y)
+
+def feat_tf(which, path, voc):
+	data = load_svmlight_file(path)
+	xdata = data[0]
+	ydata = data[1]
+	ydata = (ydata > baseline)
+	if (which == 'tf'):
+		print("Document to tf matrix:")
+		xdata = normalize(xdata, norm='l1', axis=1)
+	elif (which == 'tfidf'):
+		print("Document to tfidf matrix:")
+		tfidf = TfidfTransformer()
+		xdata = tfidf.fit_transform(xdata)
+	else:
+		print("Document to bbow matrix:")
+		xdata = (xdata != 0)
+	return (xdata, np.array(ydata))
 
 def tfidf(path1, path2):
 	print("Document to tfidf matrix:")
@@ -218,9 +245,83 @@ def word2vec(path1, path2, voc):
 	mat = np.array(corpus_tot)
 	(corpus_rand, y) = randomise(mat, len_pos, len_neg)
 	return (np.array(corpus_rand), y)
-	
+
+def gensim_getCorpusWord(path1, voc):
+	data = load_svmlight_file(path)
+	xdata = data[0]
+	ydata = data[1]
+	ydata = (ydata > baseline)
+	model = KeyedVectors.load_word2vec_format('../GoogleNews.bin', binary=True)
+	corpus = []
+	vec = 0
+	num = 0
+	for i in xdata:
+		for y in i.nonzero()[1]:
+			w = voc[y]
+			w = w.split("\n")
+			w = w[0]
+			try:
+				final = model[w]
+			except KeyError:
+				continue
+			vec = vec + final
+			num = num + 1
+			# print w
+		vec = (vec/(num*1.0))
+		# print num
+		corpus.append(vec)
+	return (np.array(corpus), np.array(ydata))
+
+def gensim_getCorpusGlove(path, voc):
+	print("Document to average of Glove vectors:")
+	data = load_svmlight_file(path)
+	xdata = data[0]
+	ydata = data[1]
+	ydata = (ydata > baseline)
+	model = KeyedVectors.load_word2vec_format('../glove.6B/glove.6B.300d.txt', binary=False)
+	corpus = []
+	vec = 0
+	num = 0
+	for i in xdata:
+		for y in i.nonzero()[1]:
+			w = voc[y]
+			w = w.split("\n")
+			w = w[0]
+			try:
+				final = model[w]
+			except KeyError:
+				continue
+			vec = vec + final
+			num = num + 1
+			# print w
+		# break
+		vec = (vec/(num*1.0))
+		# print num
+		corpus.append(vec)
+	return (np.array(corpus), np.array(ydata))
 
 #-------------- Classification Algorithms --------------------------------------------------
+
+from keras.models import Sequential
+from keras.layers import Dense
+from keras.layers import LSTM
+from keras.layers.embeddings import Embedding
+from keras.preprocessing import sequence
+def lstm(path1, path2):
+	model = KeyedVectors.load_word2vec_format('../glove.6B/glove.6B.300d.txt', binary=False)
+	print("Reading positive reviews:")
+	corpus_pos = []
+	corpus_pos = getCorpusGlove(corpus_pos, path1, voc)
+	len_pos = len(corpus_pos)
+	# print(corpus_pos[0])
+
+	print("Reading negative reviews:")	
+	corpus_tot = getCorpusGlove(corpus_pos, path2, voc)
+	len_neg = len(corpus_tot) - len_pos
+	mat = np.array(corpus_tot)
+	(corpus_rand, y) = randomise(mat, len_pos, len_neg)
+	return (np.array(corpus_rand), y)
+	
 
 def getAccuracy(ytest, y_pred):
 	tot = 0.0
@@ -268,10 +369,19 @@ def neural_network(xtrain, ytrain, xtest, ytest):
 #----------------- Combining the above two ---------------------------------------------------
 
 def main():
-	voc = getVocab(path_train_pos, path_train_neg)
-	(xtrain,ytrain) = word2vec(path_train_pos, path_train_neg, voc)
-	print(xtrain.shape)
-	(xtest,ytest) = word2vec(path_test_pos, path_test_neg, voc)
+	# voc = getVocab(path_train_pos, path_train_neg)
+	voc = {}
+	with open("dataset/imdb.vocab") as f:
+		i = 0
+		for line in f:
+			val = line
+			voc[i] = val
+			i = i + 1
+	# (xtrain, ytrain) = gensim_getCorpusWord(path_train_feat, voc)
+	# (xtest, ytest) = gensim_getCorpusWord(path_test_feat, voc)
+	# (xtrain,ytrain) = word2vec(path_train_pos, path_train_neg, voc)
+	# print(xtrain.shape)
+	# (xtest,ytest) = word2vec(path_test_pos, path_test_neg, voc)
 	 
 	# exit()
 	# ytrain = mat1[:, 0:1]
@@ -289,7 +399,10 @@ def main():
 	# print ytrain
 	# ytrain = sparse.csr_matrix(ytrain)
 	# print ytrain
-	print logisticRegression(xtrain, ytrain, xtest, ytest)
+	(xtrain, ytrain) = gensim_getCorpusGlove(path_train_feat, voc)
+	# exit()
+	(xtest, ytest) = gensim_getCorpusGlove(path_test_feat, voc)
+	print logisticRegression(xtrain, ytrain, xtest, ytest)	
 	# print supportVM(xtrain, ytrain, xtest, ytest)
 	
 

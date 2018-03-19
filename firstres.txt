@@ -1,0 +1,33 @@
+bbow
+Document to bbow matrix:
+Document to bbow matrix:
+Performing Logistic Regression classification:
+0.86972
+Performing Naive Bayes classification:
+0.82992
+Performing SVM classification:
+0.6694
+Performing Neural Network classification:
+0.5
+tf
+Document to tf matrix:
+Document to tf matrix:
+Performing Logistic Regression classification:
+0.7312
+Performing Naive Bayes classification:
+0.82468
+Performing SVM classification:
+0.63152
+Performing Neural Network classification:
+0.5
+tfidf
+Document to tfidf matrix:
+Document to tfidf matrix:
+Performing Logistic Regression classification:
+0.883
+Performing Naive Bayes classification:
+0.83072
+Performing SVM classification:
+0.63416
+Performing Neural Network classification:
+0.5
