@@ -47,7 +47,9 @@ class LabeledLineSentence(object):
         for idx, doc in enumerate(self.doc_list):
               yield gensim.models.doc2vec.LabeledSentence(doc, [self.labels_list[idx]])
 
-# corpus = nlp_clean(corpus)
+corpus = nlp_clean(corpus)
+print corpus
+exit()
 
 it = LabeledLineSentence(corpus, doclabels)
 

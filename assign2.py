@@ -4,6 +4,7 @@ import numpy as np
 import re
 import gensim
 import spacy
+import nltk
 
 from scipy import sparse
 # from sklearn.feature_extraction.text import CountVectorizer
@@ -12,7 +13,7 @@ from sklearn.feature_extraction.text import TfidfTransformer
 from sklearn.datasets import load_svmlight_file
 from sklearn.preprocessing import normalize
 from tqdm import tqdm
-from nltk.corpus import brown
+# from nltk.corpus import brown
 from spacy.vectors import Vectors
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
@@ -30,14 +31,14 @@ stop_words = set(stopwords.words('english'))
 path_train_feat = 'dataset/train/rand_labeledBow.feat'
 path_test_feat = 'dataset/test/rand_labeledBow.feat'
 
-path_train_pos = '../dataset/train/pos/'
-path_train_neg = '../dataset/train/neg/'
-path_test_pos = '../dataset/test/pos/'
-path_test_neg = '../dataset/test/neg/'
+path_train_pos = 'dataset/train/pos/'
+path_train_neg = 'dataset/train/neg/'
+path_test_pos = 'dataset/test/pos/'
+path_test_neg = 'dataset/test/neg/'
+path_unsup = '../dataset/train/unsup'
 
 def randomise(corpus_tot, len_pos, len_neg):
 	s = np.arange(len(corpus_tot))
-	print(len(corpus_tot))
 	np.random.shuffle(s)
 	a = np.ones([len_pos])
 	b = np.zeros([len_neg])
@@ -49,7 +50,7 @@ def randomise(corpus_tot, len_pos, len_neg):
 		corpus_rand.append(corpus_tot[i])
 		d[count] = c[i]
 		count = count + 1
-		print count
+		# print count
 	return (corpus_rand, d)
 	
 
@@ -300,6 +301,44 @@ def gensim_getCorpusGlove(path, voc):
 		corpus.append(vec)
 	return (np.array(corpus), np.array(ydata))
 
+def read_doc2vec(path, documents, tag):
+	tokenizer = nltk.RegexpTokenizer(r'\w+')
+	for filename in glob.glob(os.path.join('../dataset/train/pos/', '*.txt')):
+		f = open(filename, 'r')
+		txt = f.read()
+		words = tokenizer.tokenize(txt)
+		tags = [tag]
+		tag = tag + 1
+		documents.append(gensim.models.doc2vec.TaggedDocument(words=words,tags=tags))
+	return (documents, tag)
+
+def doc2vec(path1, path2, path3, path4, path5):
+	documents = []
+	(documents, tag_pos) = read_doc2vec(path1, documents, 0)
+	(documents, tag_neg) = read_doc2vec(path2, documents, tag_pos)
+	(documents, tag_pos_t) = read_doc2vec(path3, documents, tag_neg)
+	(documents, tag_neg_t) = read_doc2vec(path4, documents, tag_pos_t)
+	# (documents, tag) = read_doc2vec(path5, documents, tag_neg_t)
+	model = gensim.models.Doc2Vec(documents, vector_size=300, window=5, min_count=1, workers=4)
+	model.train(documents, total_examples=len(documents), epochs=10)
+	# model.save('my_model.doc2vec')
+	corpus = []
+	# ytrain = np.zeros([tag_neg])
+	# ytest = np.zeros([tag_neg_t - tag_neg])
+	for i in range(tag_neg_t):
+		corpus.append(model[i])
+		# if (i<tag_pos):
+		# 	ytrain[i] = 1
+		# if (i>=tag_neg) and (i<tag_pos_t):
+		# 	ytest[i] = 1
+	corpus = np.array(corpus)
+	xtrain = corpus[0:tag_neg]
+	xtest = corpus[tag_neg:]
+	(xtrain, ytrain) = randomise(xtrain, tag_pos, tag_neg-tag_pos)
+	(xtest, ytest) = randomise(xtest, tag_pos_t - tag_neg, tag_neg_t-tag_pos_t)
+	return (xtrain, ytrain, xtest, ytest)
+
+	
 #-------------- Classification Algorithms --------------------------------------------------
 
 from keras.models import Sequential
@@ -307,21 +346,37 @@ from keras.layers import Dense
 from keras.layers import LSTM
 from keras.layers.embeddings import Embedding
 from keras.preprocessing import sequence
-def lstm(path1, path2):
-	model = KeyedVectors.load_word2vec_format('../glove.6B/glove.6B.300d.txt', binary=False)
+def lstm(path1, path2, voc):
+	model = KeyedVectors.load_word2vec_format('../glove.6B/glove.6B.50d.txt', binary=False)
 	print("Reading positive reviews:")
 	corpus_pos = []
-	corpus_pos = getCorpusGlove(corpus_pos, path1, voc)
+	corpus_pos = getCorpusWord(corpus_pos, path1, voc, model)
 	len_pos = len(corpus_pos)
 	# print(corpus_pos[0])
 
 	print("Reading negative reviews:")	
-	corpus_tot = getCorpusGlove(corpus_pos, path2, voc)
+	corpus_tot = getCorpusWord(corpus_pos, path2, voc, model)
 	len_neg = len(corpus_tot) - len_pos
 	mat = np.array(corpus_tot)
 	(corpus_rand, y) = randomise(mat, len_pos, len_neg)
-	return (np.array(corpus_rand), y)
-	
+
+	# max_review_length = 500
+	some = np.array(corpus_rand)
+	print some
+	print some.shape
+	exit()
+	xdata = sequence.pad_sequences(corpus_rand, maxlen=max_review_length)
+	# print xdata
+	print xdata.shape
+	# return
+	embedding_vecor_length = 32
+	model = Sequential()
+	model.add(Embedding(top_words, embedding_vecor_length, input_length=max_review_length))
+	model.add(LSTM(100))
+	model.add(Dense(1, activation='sigmoid'))
+	model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+	print(model.summary())
+	model.fit(xdata, y, epochs=3, batch_size=64)	
 
 def getAccuracy(ytest, y_pred):
 	tot = 0.0
@@ -360,7 +415,7 @@ from sklearn.neural_network import MLPClassifier
 def neural_network(xtrain, ytrain, xtest, ytest):
 	print("Performing Neural Network classification:")
 	clf = MLPClassifier(solver='lbfgs', alpha=1e-5,
-                    hidden_layer_sizes=(5, 2), random_state=1)
+                    hidden_layer_sizes=(15, 10), random_state=1)
 	clf.fit(xtrain, ytrain)
 	y_pred = clf.predict(xtest)
 	accur = getAccuracy(ytest, y_pred)
@@ -377,7 +432,9 @@ def main():
 			val = line
 			voc[i] = val
 			i = i + 1
-	# (xtrain, ytrain) = gensim_getCorpusWord(path_train_feat, voc)
+	
+	# (xtrain, ytrain) = gensim_getCorpusGlove(path_train_feat, voc)
+	# print(xtrain.shape)
 	# (xtest, ytest) = gensim_getCorpusWord(path_test_feat, voc)
 	# (xtrain,ytrain) = word2vec(path_train_pos, path_train_neg, voc)
 	# print(xtrain.shape)
@@ -399,9 +456,16 @@ def main():
 	# print ytrain
 	# ytrain = sparse.csr_matrix(ytrain)
 	# print ytrain
-	(xtrain, ytrain) = gensim_getCorpusGlove(path_train_feat, voc)
+	# lstm(path_train_pos, path_train_neg, voc)
 	# exit()
-	(xtest, ytest) = gensim_getCorpusGlove(path_test_feat, voc)
+	# (xtrain, ytrain) = gensim_getCorpusGlove(path_train_feat, voc)
+	# exit()
+	# (xtest, ytest) = gensim_getCorpusGlove(path_test_feat, voc)
+	# (xtrain, ytrain) = feat_tf('tf', path_train_feat, voc)
+	# (xtest, ytest) = feat_tf('tf', path_test_feat, voc)
+	# padding = np.zeros((xtest.shape[0],4))
+	# xtest = sparse.hstack((xtest,padding))
+	(xtrain, ytrain, xtest, ytest) = doc2vec(path_train_pos, path_train_neg, path_test_pos, path_test_neg, path_unsup)
 	print logisticRegression(xtrain, ytrain, xtest, ytest)	
 	# print supportVM(xtrain, ytrain, xtest, ytest)
 	

@@ -11,11 +11,19 @@ numpy.random.seed(7)
 # load the dataset but only keep the top n words, zero the rest
 top_words = 5000
 (X_train, y_train), (X_test, y_test) = imdb.load_data(num_words=top_words)
-
+print X_train
+a = raw_input("press any key")
+print X_train.shape
+a = raw_input("press any key")
+print(top_words)
 # truncate and pad input sequences
 max_review_length = 500
 X_train = sequence.pad_sequences(X_train, maxlen=max_review_length)
 X_test = sequence.pad_sequences(X_test, maxlen=max_review_length)
+print X_train
+a = raw_input("press any key")
+print X_train.shape
+a = raw_input("press any key")
 
 # create the model
 embedding_vecor_length = 32
